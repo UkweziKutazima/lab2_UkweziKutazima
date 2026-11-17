@@ -3,8 +3,14 @@ import sys
 import os
 
 
+
+
 def load_csv_data():
-    filename = input("Enter the name of the CSV file to process (e.g., grades.csv): ")
+    try:
+        filename = input("Enter the name of the CSV file to process (e.g., grades.csv): ")
+    except EOFError:
+        print("\nError: Input interrupted. Exiting.")
+        sys.exit(1)
     
     if not os.path.exists(filename):
         print(f"Error: The file '{filename}' was not found.")
@@ -15,17 +21,42 @@ def load_csv_data():
     try:
         with open(filename, mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
-            for row in reader:
-                assignments.append({
-                    'assignment': row['assignment'],
-                    'group': row['group'],
-                    'score': float(row['score']),
-                    'weight': float(row['weight'])
-                })
+            for row_num, row in enumerate(reader, start=2):
+                try:
+                    assignment_name = row['assignment'].strip()
+                    group = row['group'].strip()
+                    
+                    if not assignment_name:
+                        print(f"Error on line {row_num}: Assignment name is empty.")
+                        sys.exit(1)
+                        
+                    score = float(row['score'])
+                    weight = float(row['weight'])
+                    
+                    if score != score or weight != weight:
+                        print(f"Error on line {row_num}: Score or weight is 'nan'.")
+                        sys.exit(1)
+                        
+                    assignments.append({
+                        'assignment': assignment_name,
+                        'group': group,
+                        'score': score,
+                        'weight': weight
+                    })
+                except (KeyError, ValueError, TypeError):
+                    print(f"Error on line {row_num}: Missing fields or invalid data format. Please check your CSV.")
+                    sys.exit(1)
+                    
+        if not assignments:
+            print("Error: The CSV file is empty or contains no valid data.")
+            sys.exit(1)
+            
         return assignments
     except Exception as e:
         print(f"An error occurred while reading the file: {e}")
         sys.exit(1)
+
+
 
 
 def evaluate_grades(data):
@@ -42,6 +73,11 @@ def evaluate_grades(data):
 
 
     for item in data:
+        if item['weight'] <= 0:
+            print(f"Error: Weight for '{item['assignment']}' must be greater than 0. Got {item['weight']}.")
+            sys.exit(1)
+
+
         if item['score'] < 0 or item['score'] > 100:
             print(f"Error: Score for '{item['assignment']}' is {item['score']}. Must be between 0 and 100.")
             return
@@ -54,7 +90,7 @@ def evaluate_grades(data):
         elif item['group'] == 'Summative':
             summative_weight += item['weight']
             
-    if total_weight != 100 or formative_weight != 60 or summative_weight != 40:
+    if round(total_weight, 2) != 100 or round(formative_weight, 2) != 60 or round(summative_weight, 2) != 40:
         print("Weight Validation Error:")
         print(f" - Total Weight: {total_weight} (Expected: 100)")
         print(f" - Formative Weight: {formative_weight} (Expected: 60)")
@@ -97,6 +133,8 @@ def evaluate_grades(data):
             print("\nResubmission Options (Highest weight failed formatives):")
             for r in resubmissions:
                 print(f" - {r}")
+
+
 
 
 if __name__ == "__main__":
